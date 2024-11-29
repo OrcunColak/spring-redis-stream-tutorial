@@ -3,12 +3,13 @@ package com.colak.springtutorial.producer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.connection.stream.ObjectRecord;
+import org.springframework.data.redis.connection.stream.RecordId;
+import org.springframework.data.redis.connection.stream.StreamRecords;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.StreamOperations;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -20,17 +21,23 @@ public class RedisStreamProducer {
 
     private final RedisTemplate<String, String> redisTemplate;
 
-    public void produceMessage(String user, String message) {
+    public RecordId  produceMessage(String message) {
         // Create a map of the message fields
-        Map<String, String> messageData = new HashMap<>();
-        messageData.put("user", user);
-        messageData.put("message", message);
+        ObjectRecord<String, String> record = StreamRecords.newRecord()
+                .ofObject(message)
+                .withStreamKey(streamName);
 
-        // Write the message to the stream
-        StreamOperations<String, String, String> streamOps = redisTemplate.opsForStream();
-        streamOps.add(streamName, messageData);
+        RecordId recordId = this.redisTemplate.opsForStream()
+                .add(record);
 
-        log.info("Message added to stream: {}", messageData);
+        log.info("recordId: {}", recordId);
+
+        if (Objects.isNull(recordId)) {
+            log.info("error sending event: {}", message);
+            return null;
+        }
+
+        return recordId;
     }
 }
 
